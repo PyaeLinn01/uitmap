@@ -2,6 +2,7 @@ import pygame
 from pygame.locals import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
+from OpenGL.GLUT import glutInit, glutWireCube
 import numpy as np
 
 # Window size
@@ -46,11 +47,9 @@ def main():
     pygame.display.set_mode((WIDTH, HEIGHT), DOUBLEBUF | OPENGL)
     pygame.display.set_caption('UIT Map Simulation')
 
+    glutInit()
     gluPerspective(60, WIDTH / HEIGHT, 0.1, 100.0)
     glEnable(GL_DEPTH_TEST)
-
-    from OpenGL.GLUT import glutInit, glutWireCube
-    glutInit()
 
     clock = pygame.time.Clock()
     running = True
