@@ -1,92 +1,100 @@
 import pygame
-from pygame.locals import *
-from OpenGL.GL import *
-from OpenGL.GLU import *
-from OpenGL.GLUT import glutInit, glutWireCube
-import numpy as np
+import sys
+import math
 
 # Window size
 WIDTH, HEIGHT = 800, 600
 
-# Camera settings
-camera_pos = [0.0, 1.0, 10.0]  # x, y, z
-camera_front = [0.0, 0.0, -1.0]
-camera_up = [0.0, 1.0, 0.0]
-speed = 0.2
+# Colors
+BG_COLOR = (200, 240, 200)
+BUILDING_COLOR = (180, 180, 230)
+CANTEEN_COLOR = (240, 220, 160)
+CARPARK_COLOR = (120, 120, 120)
+MOVER_COLOR = (255, 180, 60)
+MOVER_OUTLINE = (200, 100, 0)
 
-def draw_cube(x, y, z, w, h, d, color):
-    glPushMatrix()
-    glTranslatef(x, y, z)
-    glScalef(w, h, d)
-    glColor3fv(color)
-    glutWireCube(1)
-    glPopMatrix()
+# Map objects (x, y, w, h)
+buildings = [
+    (150, 100, 120, 240),  # Building 1
+    (530, 100, 120, 240),  # Building 2
+]
+canteen = (340, 400, 120, 60)
+carpark = (340, 500, 120, 60)
 
-def draw_scene():
-    # Ground
-    glColor3f(0.6, 0.8, 0.6)
-    glBegin(GL_QUADS)
-    glVertex3f(-50, 0, -50)
-    glVertex3f(-50, 0, 50)
-    glVertex3f(50, 0, 50)
-    glVertex3f(50, 0, -50)
-    glEnd()
+# Mover (pizza slice)
+mover_pos = [WIDTH // 2, HEIGHT // 2]
+mover_speed = 4
+mover_size = 24
+mover_angle = 0  # 0=up, 90=right, 180=down, 270=left
 
-    # Buildings (two 6-story blocks)
-    draw_cube(-10, 3, 0, 8, 6, 8, (0.7, 0.7, 0.9))
-    draw_cube(10, 3, 0, 8, 6, 8, (0.7, 0.7, 0.9))
+def draw_map(screen):
+    screen.fill(BG_COLOR)
+    # Draw buildings
+    for rect in buildings:
+        pygame.draw.rect(screen, BUILDING_COLOR, rect)
+    # Draw canteen
+    pygame.draw.rect(screen, CANTEEN_COLOR, canteen)
+    # Draw car park
+    pygame.draw.rect(screen, CARPARK_COLOR, carpark)
 
-    # Canteen
-    draw_cube(0, 1, 15, 6, 2, 6, (0.9, 0.8, 0.6))
+def draw_mover(screen, pos, angle):
+    x, y = pos
+    # Pizza slice triangle points
+    points = [
+        (x, y - mover_size),  # tip
+        (x - mover_size//2, y + mover_size//2),
+        (x + mover_size//2, y + mover_size//2),
+    ]
+    # Rotate points
+    rotated = []
+    for px, py in points:
+        dx, dy = px - x, py - y
+        rad = angle * math.pi / 180
+        rx = dx * math.cos(rad) - dy * math.sin(rad)
+        ry = dx * math.sin(rad) + dy * math.cos(rad)
+        rotated.append((x + rx, y + ry))
+    pygame.draw.polygon(screen, MOVER_COLOR, rotated)
+    pygame.draw.polygon(screen, MOVER_OUTLINE, rotated, 2)
 
-    # Underground car park (drawn as a sunken cube)
-    draw_cube(0, -1, -15, 10, 2, 10, (0.5, 0.5, 0.5))
 
 def main():
     pygame.init()
-    pygame.display.set_mode((WIDTH, HEIGHT), DOUBLEBUF | OPENGL)
-    pygame.display.set_caption('UIT Map Simulation')
-
-    glutInit()
-    gluPerspective(60, WIDTH / HEIGHT, 0.1, 100.0)
-    glEnable(GL_DEPTH_TEST)
-
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption('UIT Map Simulation (2D)')
     clock = pygame.time.Clock()
-    running = True
-    global camera_pos
 
-    while running:
+    global mover_pos, mover_angle
+
+    while True:
         for event in pygame.event.get():
-            if event.type == QUIT:
-                running = False
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
 
         keys = pygame.key.get_pressed()
-        front = np.array(camera_front)
-        right = np.cross(front, camera_up)
-        right = right / np.linalg.norm(right)
-        if keys[K_w]:
-            camera_pos[0] += front[0] * speed
-            camera_pos[2] += front[2] * speed
-        if keys[K_s]:
-            camera_pos[0] -= front[0] * speed
-            camera_pos[2] -= front[2] * speed
-        if keys[K_a]:
-            camera_pos[0] -= right[0] * speed
-            camera_pos[2] -= right[2] * speed
-        if keys[K_d]:
-            camera_pos[0] += right[0] * speed
-            camera_pos[2] += right[2] * speed
+        move = [0, 0]
+        if keys[pygame.K_w]:
+            move[1] -= mover_speed
+            mover_angle = 0
+        if keys[pygame.K_s]:
+            move[1] += mover_speed
+            mover_angle = 180
+        if keys[pygame.K_a]:
+            move[0] -= mover_speed
+            mover_angle = 270
+        if keys[pygame.K_d]:
+            move[0] += mover_speed
+            mover_angle = 90
+        mover_pos[0] += move[0]
+        mover_pos[1] += move[1]
+        # Keep in bounds
+        mover_pos[0] = max(mover_size, min(WIDTH - mover_size, mover_pos[0]))
+        mover_pos[1] = max(mover_size, min(HEIGHT - mover_size, mover_pos[1]))
 
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        glLoadIdentity()
-        gluLookAt(camera_pos[0], camera_pos[1], camera_pos[2],
-                  camera_pos[0] + camera_front[0], camera_pos[1], camera_pos[2] + camera_front[2],
-                  camera_up[0], camera_up[1], camera_up[2])
-        draw_scene()
+        draw_map(screen)
+        draw_mover(screen, mover_pos, mover_angle)
         pygame.display.flip()
         clock.tick(60)
 
-    pygame.quit()
-
 if __name__ == '__main__':
-    main() 
+    main()
